@@ -84,7 +84,7 @@ def train(model, df, label_map):
 
         if max_only_p5 < p5:
             max_only_p5 = p5
-            model.save_model(f'models/model-{get_exp_name()}.bin')
+            model.save_model(f'/content/drive/MyDrive/XMC/LightXML/models/model-{get_exp_name()}.bin')
 
         if epoch >= args.epoch + 5 and max_only_p5 != p5:
             break
@@ -132,6 +132,9 @@ parser.add_argument('--hidden_dim', type=int, required=False, default=300)
 
 parser.add_argument('--eval_model', action='store_true')
 
+parser.add_argument('--load_chk', action='store_true', required = False)
+parser.add_argument('--load_chk_name', type=str, required = False, default = 'model-eurlex4k')
+
 args = parser.parse_args()
 
 if __name__ == '__main__':
@@ -172,9 +175,12 @@ if __name__ == '__main__':
         model = LightXML(n_labels=len(label_map), bert=args.bert,
                          update_count=args.update_count,
                          use_swa=args.swa, swa_warmup_epoch=args.swa_warmup, swa_update_step=args.swa_step)
+    if args.load_chk:
+        model.load_state_dict(torch.load(f'/content/drive/MyDrive/XMC/LightXML/models/{args.load_chk_name}.bin'))
+        model = model.cuda()
 
     if args.eval_model and args.dataset in ['wiki500k', 'amazon670k']:
-        print(f'load models/model-{get_exp_name()}.bin')
+        print(f'load /content/drive/MyDrive/XMC/LightXML/models/model-{get_exp_name()}.bin')
         testloader = DataLoader(MDataset(df, 'test', model.get_fast_tokenizer(), label_map, args.max_len, 
                                          candidates_num=args.group_y_candidate_num),
                                 batch_size=256, num_workers=0, 
@@ -185,15 +191,15 @@ if __name__ == '__main__':
                                           candidates_num=args.group_y_candidate_num),
                                  batch_size=256, num_workers=0, 
                             shuffle=False)
-        model.load_state_dict(torch.load(f'models/model-{get_exp_name()}.bin'))
+        model.load_state_dict(torch.load(f'/content/drive/MyDrive/XMC/LightXML/models/model-{get_exp_name()}.bin'))
         model = model.cuda()
 
         print(len(df[df.dataType == 'test']))
         model.one_epoch(0, validloader, None, mode='eval')
 
         pred_scores, pred_labels = model.one_epoch(0, testloader, None, mode='test')
-        np.save(f'results/{get_exp_name()}-labels.npy', np.array(pred_labels))
-        np.save(f'results/{get_exp_name()}-scores.npy', np.array(pred_scores))
+        np.save(f'/content/drive/MyDrive/XMC/LightXML/results/{get_exp_name()}-labels.npy', np.array(pred_labels))
+        np.save(f'/content/drive/MyDrive/XMC/LightXML/results/{get_exp_name()}-scores.npy', np.array(pred_scores))
         sys.exit(0)
 
     train(model, df, label_map)
