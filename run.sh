@@ -1,6 +1,5 @@
 #!/bin/bash
 set -e
-
 function gdrive-get() {
     fileid=$1
     filename=$2
@@ -21,7 +20,7 @@ function gdrive-get() {
     fi
 }
 
-if [ $# = 4 ]; then
+if [ $# = 3 ]; then
     echo start $1
     echo "Loading from checkpoint"
     python src/main.py --lr 1e-4 --epoch 20 --dataset eurlex4k --swa --swa_warmup 10 --swa_step 200 --batch 8 --load_chk --load_chk_name model-eurlex4k
