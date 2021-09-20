@@ -24,16 +24,16 @@ train and eval
 
 LightXML concats the last 5 hidden layers of the transformer output to create text embeddings. While the transformer model does have self-attention built in, the squeeze and excitation block adds a second layer of attention between these 5 hidden layers. It allows the text representations to be more expressive since the more relevant layers will be scaled up. Another self-attention layer can be added for each element of the embedding, however, that will increase the model size much more than this block.
 
-Implementation of the same can be viewed in the ```se_embed``` branch.
+Implementation of the same can be viewed in the ```squeeze_and_excitation``` branch.
 
 ### Loss Correction
 
 There seems to be an oversight in the original LightXML paper. It mentions that the loss function would be ```Lg + Ld``` and would be backpropagated from the discriminator. However, since ```Lg``` does not contain any information of the discriminator, it instantly goes to 0 in the first partial derivative. Therefore, all the gradient updates that occur in the generator happen due to the information in ```Ld```. While this is giving good results, it has not reached its full potential, since the generator loss function information is not being used. To fix this, add the generator loss to upstream loss and continue the backpropagation process.
 
-Implementation of the same can be viewed in the ```loss_corr``` branch.
+Implementation of the same can be viewed in the ```loss_correction``` branch.
 
 ### Negative Sampling
 
 Eventually, the top b clusters for any instance would not change very much due to the stochastic weight averaging reducing the gradient magnitudes and stabilisation of the model. To keep the proces of dynamic negative sampling vcontinuing, we can randomly choose and add a fixed number of negative labels to each instance. The same was implemented in the Astec algorithm.
 
-Implementation of the same can be viewed in the ```neg_sampling``` branch.
+<!-- Implementation of the same can be viewed in the ```negative_sampling``` branch. -->
