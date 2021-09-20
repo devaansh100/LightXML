@@ -53,8 +53,6 @@ def train(model, optimizer, df, label_map, max_only_p5 = 0, epoch = 1):
                                 shuffle=False)
 
     model.cuda()
-    no_decay = ['bias', 'LayerNorm.weight']
-    
         
     model, optimizer = amp.initialize(model, optimizer, opt_level="O1")
 
@@ -162,7 +160,7 @@ if __name__ == '__main__':
 
     print(f'load {args.dataset} dataset with '
           f'{len(df[df.dataType =="train"])} train {len(df[df.dataType =="test"])} test with {len(label_map)} labels done')
-
+    no_decay = ['bias', 'LayerNorm.weight']
     if args.dataset in ['wiki500k', 'amazon670k']:
         group_y = load_group(args.dataset, args.group_y_group)
         _group_y = []
@@ -199,6 +197,8 @@ if __name__ == '__main__':
         epoch = checkpoint['epoch']
         max_only_p5 = checkpoint['max_only_p5']
         model = model.cuda()
+        train(model, optimizer, df, label_map, max_only_p5, epoch)
+        sys.exit(0)
 
     if args.eval_model and args.dataset in ['wiki500k', 'amazon670k']:
         print(f'load /content/drive/MyDrive/XMC/LightXML/models/model-{get_exp_name()}.pt')
@@ -224,4 +224,4 @@ if __name__ == '__main__':
         np.save(f'/content/drive/MyDrive/XMC/LightXML/results/{get_exp_name()}-scores.npy', np.array(pred_scores))
         sys.exit(0)
 
-    train(model, optimizer, df, label_map, max_only_p5, epoch)
+    train(model, optimizer, df, label_map)
