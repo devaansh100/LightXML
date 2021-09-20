@@ -22,7 +22,7 @@ def load_group(dataset, group_tree=0):
     elif dataset == 'amazon670k':
         return np.load(f'./data/Amazon-670K/label_group{group_tree}.npy', allow_pickle=True)
 
-def train(model, optimizer, df, label_map, max_only_p5 = 0, epoch = 1):
+def train(model, optimizer, df, label_map, max_only_p5 = 0, epoch = 0):
     tokenizer = model.get_tokenizer()
 
     if args.dataset in ['wiki500k', 'amazon670k']:
@@ -56,7 +56,7 @@ def train(model, optimizer, df, label_map, max_only_p5 = 0, epoch = 1):
         
     model, optimizer = amp.initialize(model, optimizer, opt_level="O1")
 
-    for epoch_c in range(epoch, args.epoch+5):
+    for epoch_c in range(epoch+1, args.epoch+5):
         train_loss = model.one_epoch(epoch_c, trainloader, optimizer, mode='train',
                                      eval_loader=validloader if args.valid else testloader,
                                      eval_step=args.eval_step, log=LOG)
@@ -76,7 +76,7 @@ def train(model, optimizer, df, label_map, max_only_p5 = 0, epoch = 1):
         LOG.log(log_str)
 
         torch.save({
-                'epoch': epoch,
+                'epoch': epoch_c,
                 'model_state_dict': model.state_dict(),
                 'optimizer_state_dict': optimizer.state_dict(),
                 'max_only_p5': max_only_p5
@@ -85,13 +85,13 @@ def train(model, optimizer, df, label_map, max_only_p5 = 0, epoch = 1):
         if max_only_p5 < p5:
             max_only_p5 = p5
             torch.save({
-                'epoch': epoch,
+                'epoch': epoch_c,
                 'model_state_dict': model.state_dict(),
                 'optimizer_state_dict': optimizer.state_dict(),
                 'max_only_p5': max_only_p5
                 }, f'/content/drive/MyDrive/XMC/LightXML/models/model-{get_exp_name()}.pt')
 
-        if epoch >= args.epoch + 5 and max_only_p5 != p5:
+        if epoch_c >= args.epoch + 5 and max_only_p5 != p5:
             break
 
 
@@ -176,27 +176,22 @@ if __name__ == '__main__':
                           use_swa=args.swa, swa_warmup_epoch=args.swa_warmup, swa_update_step=args.swa_step,
                           candidates_topk=args.group_y_candidate_topk,
                           hidden_dim=args.hidden_dim)
-        optimizer_grouped_parameters = [
-        {'params': [p for n, p in model.named_parameters() if not any(nd in n for nd in no_decay)], 'weight_decay': 0.01},
-        {'params': [p for n, p in model.named_parameters() if any(nd in n for nd in no_decay)], 'weight_decay': 0.0}
-        ]
-        optimizer = AdamW(optimizer_grouped_parameters, lr=args.lr)#, eps=1e-8)
     else:
         model = LightXML(n_labels=len(label_map), bert=args.bert,
                          update_count=args.update_count,
                          use_swa=args.swa, swa_warmup_epoch=args.swa_warmup, swa_update_step=args.swa_step)
-        optimizer_grouped_parameters = [
-        {'params': [p for n, p in model.named_parameters() if not any(nd in n for nd in no_decay)], 'weight_decay': 0.01},
-        {'params': [p for n, p in model.named_parameters() if any(nd in n for nd in no_decay)], 'weight_decay': 0.0}
-        ]
-        optimizer = AdamW(optimizer_grouped_parameters, lr=args.lr)#, eps=1e-8)
+    model.cuda()
+    optimizer_grouped_parameters = [
+    {'params': [p for n, p in model.named_parameters() if not any(nd in n for nd in no_decay)], 'weight_decay': 0.01},
+    {'params': [p for n, p in model.named_parameters() if any(nd in n for nd in no_decay)], 'weight_decay': 0.0}
+    ]
+    optimizer = AdamW(optimizer_grouped_parameters, lr=args.lr)#, eps=1e-8)
     if args.load_chk:
         checkpoint = torch.load(f'/content/drive/MyDrive/XMC/LightXML/models/checkpoint-{get_exp_name()}.pth', map_location = torch.device('cuda'))
         model.load_state_dict(checkpoint['model_state_dict'])
         optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
         epoch = checkpoint['epoch']
         max_only_p5 = checkpoint['max_only_p5']
-        model = model.cuda()
         train(model, optimizer, df, label_map, max_only_p5, epoch)
         sys.exit(0)
 
