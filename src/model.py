@@ -141,8 +141,9 @@ class LightXML(nn.Module):
 
         if is_training:
             loss_fn = torch.nn.BCEWithLogitsLoss()
-            loss = loss_fn(logits, labels) + loss_fn(group_logits, group_labels)
-            return logits, loss
+            loss_m = loss_fn(logits, labels)
+            loss_g = loss_fn(group_logits, group_labels)
+            return logits, loss_m, loss_g
         else:
             candidates_scores = torch.sigmoid(logits)
             candidates_scores = candidates_scores * group_candidates_scores
@@ -218,7 +219,7 @@ class LightXML(nn.Module):
 
         return total, acc1, acc3, acc5
 
-    def one_epoch(self, epoch, dataloader, optimizer,
+    def one_epoch(self, epoch, dataloader, optimizer_m, optimizer_g,
                   mode='train', eval_loader=None, eval_step=20000, log=None):
 
         bar = tqdm.tqdm(total=len(dataloader))
@@ -260,19 +261,25 @@ class LightXML(nn.Module):
                 bar.update(1)
 
                 if mode == 'train':
-                    loss = outputs[1]
+                    loss_m = outputs[1]
+                    loss_g = outputs[2]
+                    loss = loss_m + moss_g
                     loss /= self.update_count
                     train_loss += loss.item()
 
-                    with amp.scale_loss(loss, optimizer) as scaled_loss:
+                    with amp.scale_loss(loss_m, optimizer_m) as scaled_loss:
+                        scaled_loss.backward()
+
+                    with amp.scale_loss(loss_g, optimizer_g) as scaled_loss:
                         scaled_loss.backward()
     
                     if step % self.update_count == 0:
-                        optimizer.step()
+                        optimizer_g.step()
+                        optimizer_m.step()
                         self.zero_grad()
 
                     if step % eval_step == 0 and eval_loader is not None and step != 0:
-                        results = self.one_epoch(epoch, eval_loader, optimizer, mode='eval')
+                        results = self.one_epoch(epoch, eval_loader, optimizer_m, optimizer_g, mode='eval')
                         p1, p3, p5 = results[3:6]
                         g_p1, g_p3, g_p5 = results[:3]
                         if self.group_y is not None:

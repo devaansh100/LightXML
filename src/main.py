@@ -22,7 +22,7 @@ def load_group(dataset, group_tree=0):
     elif dataset == 'amazon670k':
         return np.load(f'./data/Amazon-670K/label_group{group_tree}.npy', allow_pickle=True)
 
-def train(model, optimizer, df, label_map, max_only_p5 = 0, epoch = 0):
+def train(model, optimizer_g, optimizer_m, df, label_map, max_only_p5 = 0, epoch = 0):
     tokenizer = model.get_tokenizer()
 
     if args.dataset in ['wiki500k', 'amazon670k']:
@@ -54,17 +54,17 @@ def train(model, optimizer, df, label_map, max_only_p5 = 0, epoch = 0):
 
     model.cuda()
         
-    model, optimizer = amp.initialize(model, optimizer, opt_level="O1")
+    model, optimizer_m, optimizer_g = amp.initialize(model, optimizer_m, optimizer_g, opt_level="O1")
 
     for epoch_c in range(epoch+1, args.epoch+5):
-        train_loss = model.one_epoch(epoch_c, trainloader, optimizer, mode='train',
+        train_loss = model.one_epoch(epoch_c, trainloader, optimizer_m, optimizer_g, mode='train',
                                      eval_loader=validloader if args.valid else testloader,
                                      eval_step=args.eval_step, log=LOG)
 
         if args.valid:
-            ev_result = model.one_epoch(epoch_c, validloader, optimizer, mode='eval')
+            ev_result = model.one_epoch(epoch_c, validloader, optimizer_m, optimizer_g, mode='eval')
         else:
-            ev_result = model.one_epoch(epoch_c, testloader, optimizer, mode='eval')
+            ev_result = model.one_epoch(epoch_c, testloader, optimizer_m, optimizer_g, mode='eval')
 
         g_p1, g_p3, g_p5, p1, p3, p5 = ev_result
 
@@ -78,7 +78,8 @@ def train(model, optimizer, df, label_map, max_only_p5 = 0, epoch = 0):
         torch.save({
                 'epoch': epoch_c,
                 'model_state_dict': model.state_dict(),
-                'optimizer_state_dict': optimizer.state_dict(),
+                'optimizer_g_state_dict': optimizer_g.state_dict(),
+                'optimizer_m_state_dict_m': optimizer_m.state_dict(),
                 'max_only_p5': max_only_p5
                 }, f'/content/drive/MyDrive/XMC/LightXML/models/checkpoint-{get_exp_name()}.pth')
         print(f'Saving checkpoint at {epoch_c} epochs')
@@ -87,7 +88,8 @@ def train(model, optimizer, df, label_map, max_only_p5 = 0, epoch = 0):
             torch.save({
                 'epoch': epoch_c,
                 'model_state_dict': model.state_dict(),
-                'optimizer_state_dict': optimizer.state_dict(),
+                'optimizer_g_state_dict_g': optimizer_g.state_dict(),
+                'optimizer_m_state_dict_m': optimizer_m.state_dict(),
                 'max_only_p5': max_only_p5
                 }, f'/content/drive/MyDrive/XMC/LightXML/models/model-{get_exp_name()}.pt')
             print(f'max_only_p5 reduced from {p5} to {max_only_p5}. Saving model at {epoch_c} epochs')
@@ -183,18 +185,24 @@ if __name__ == '__main__':
                          update_count=args.update_count,
                          use_swa=args.swa, swa_warmup_epoch=args.swa_warmup, swa_update_step=args.swa_step)
     model.cuda()
-    optimizer_grouped_parameters = [
+    optimizer_g_grouped_parameters = [
+    {'params': [p for n, p in model.l0.named_parameters() if not any(nd in n for nd in no_decay)], 'weight_decay': 0.01},
+    {'params': [p for n, p in model.l0.named_parameters() if any(nd in n for nd in no_decay)], 'weight_decay': 0.0}
+    ]
+    optimizer_m_grouped_parameters = [
     {'params': [p for n, p in model.named_parameters() if not any(nd in n for nd in no_decay)], 'weight_decay': 0.01},
     {'params': [p for n, p in model.named_parameters() if any(nd in n for nd in no_decay)], 'weight_decay': 0.0}
     ]
-    optimizer = AdamW(optimizer_grouped_parameters, lr=args.lr)#, eps=1e-8)
+    optimizer_g = AdamW(optimizer_g_grouped_parameters, lr=args.lr)#, eps=1e-8)
+    optimizer_m = AdamW(optimizer_m_grouped_parameters, lr=args.lr)#, eps=1e-8)
     if args.load_chk:
         checkpoint = torch.load(f'/content/drive/MyDrive/XMC/LightXML/models/checkpoint-{get_exp_name()}.pth', map_location = torch.device('cuda'))
         model.load_state_dict(checkpoint['model_state_dict'])
-        optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        optimizer_g.load_state_dict(checkpoint['optimizer_g_state_dict'])
+        optimizer_m.load_state_dict(checkpoint['optimizer_m_state_dict'])
         epoch = checkpoint['epoch']
         max_only_p5 = checkpoint['max_only_p5']
-        train(model, optimizer, df, label_map, max_only_p5, epoch)
+        train(model, optimizer_g, optimizer_m, df, label_map, max_only_p5, epoch)
         sys.exit(0)
 
     if args.eval_model and args.dataset in ['wiki500k', 'amazon670k']:
@@ -221,4 +229,4 @@ if __name__ == '__main__':
         np.save(f'/content/drive/MyDrive/XMC/LightXML/results/{get_exp_name()}-scores.npy', np.array(pred_scores))
         sys.exit(0)
 
-    train(model, optimizer, df, label_map)
+    train(model, optimizer_g, optimizer_m, df, label_map)
