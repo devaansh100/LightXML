@@ -14,6 +14,8 @@ from transformers import XLNetTokenizer, XLNetModel, XLNetConfig
 from tokenizers import BertWordPieceTokenizer
 from transformers import RobertaTokenizerFast
 
+from squeeze_excitation import SqueezeExcitation
+
 def get_bert(bert_name):
     if 'roberta' in bert_name:
         print('load roberta-base')
@@ -93,7 +95,6 @@ class LightXML(nn.Module):
             attention_mask=attention_mask,
             token_type_ids=token_type_ids
         )[-1]
-
         out = torch.cat([outs[-i][:, 0] for i in range(1, self.feature_layers+1)], dim=-1)
         out = self.drop_out(out)
         group_logits = self.l0(out)
