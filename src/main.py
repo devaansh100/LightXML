@@ -22,7 +22,7 @@ def load_group(dataset, group_tree=0):
     elif dataset == 'amazon670k':
         return np.load(f'./data/Amazon-670K/label_group{group_tree}.npy', allow_pickle=True)
 
-def train(model, df, label_map):
+def train(model, optimizer, df, label_map, max_only_p5 = 0, epoch = 1):
     tokenizer = model.get_tokenizer()
 
     if args.dataset in ['wiki500k', 'amazon670k']:
@@ -54,24 +54,19 @@ def train(model, df, label_map):
 
     model.cuda()
     no_decay = ['bias', 'LayerNorm.weight']
-    optimizer_grouped_parameters = [
-        {'params': [p for n, p in model.named_parameters() if not any(nd in n for nd in no_decay)], 'weight_decay': 0.01},
-        {'params': [p for n, p in model.named_parameters() if any(nd in n for nd in no_decay)], 'weight_decay': 0.0}
-        ]
-    optimizer = AdamW(optimizer_grouped_parameters, lr=args.lr)#, eps=1e-8)
+    
         
     model, optimizer = amp.initialize(model, optimizer, opt_level="O1")
 
-    max_only_p5 = 0
-    for epoch in range(0, args.epoch+5):
-        train_loss = model.one_epoch(epoch, trainloader, optimizer, mode='train',
+    for epoch_c in range(epoch, args.epoch+5):
+        train_loss = model.one_epoch(epoch_c, trainloader, optimizer, mode='train',
                                      eval_loader=validloader if args.valid else testloader,
                                      eval_step=args.eval_step, log=LOG)
 
         if args.valid:
-            ev_result = model.one_epoch(epoch, validloader, optimizer, mode='eval')
+            ev_result = model.one_epoch(epoch_c, validloader, optimizer, mode='eval')
         else:
-            ev_result = model.one_epoch(epoch, testloader, optimizer, mode='eval')
+            ev_result = model.one_epoch(epoch_c, testloader, optimizer, mode='eval')
 
         g_p1, g_p3, g_p5, p1, p3, p5 = ev_result
 
@@ -82,9 +77,21 @@ def train(model, df, label_map):
             log_str += ' valid'
         LOG.log(log_str)
 
+        torch.save({
+                'epoch': epoch,
+                'model_state_dict': model.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict(),
+                'max_only_p5': max_only_p5
+                }, f'/content/drive/MyDrive/XMC/LightXML/models/checkpoint-{get_exp_name()}.pth')
+
         if max_only_p5 < p5:
             max_only_p5 = p5
-            model.save_model(f'/content/drive/MyDrive/XMC/LightXML/models/model-{get_exp_name()}.bin')
+            torch.save({
+                'epoch': epoch,
+                'model_state_dict': model.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict(),
+                'max_only_p5': max_only_p5
+                }, f'/content/drive/MyDrive/XMC/LightXML/models/model-{get_exp_name()}.pt')
 
         if epoch >= args.epoch + 5 and max_only_p5 != p5:
             break
@@ -156,6 +163,10 @@ if __name__ == '__main__':
     print(f'load {args.dataset} dataset with '
           f'{len(df[df.dataType =="train"])} train {len(df[df.dataType =="test"])} test with {len(label_map)} labels done')
 
+    optimizer_grouped_parameters = [
+        {'params': [p for n, p in model.named_parameters() if not any(nd in n for nd in no_decay)], 'weight_decay': 0.01},
+        {'params': [p for n, p in model.named_parameters() if any(nd in n for nd in no_decay)], 'weight_decay': 0.0}
+        ]
     if args.dataset in ['wiki500k', 'amazon670k']:
         group_y = load_group(args.dataset, args.group_y_group)
         _group_y = []
@@ -171,16 +182,22 @@ if __name__ == '__main__':
                           use_swa=args.swa, swa_warmup_epoch=args.swa_warmup, swa_update_step=args.swa_step,
                           candidates_topk=args.group_y_candidate_topk,
                           hidden_dim=args.hidden_dim)
+        optimizer = AdamW(optimizer_grouped_parameters, lr=args.lr)#, eps=1e-8)
     else:
         model = LightXML(n_labels=len(label_map), bert=args.bert,
                          update_count=args.update_count,
                          use_swa=args.swa, swa_warmup_epoch=args.swa_warmup, swa_update_step=args.swa_step)
+        optimizer = AdamW(optimizer_grouped_parameters, lr=args.lr)#, eps=1e-8)
     if args.load_chk:
-        model.load_state_dict(torch.load(f'/content/drive/MyDrive/XMC/LightXML/models/{args.load_chk_name}.bin'))
+        checkpoint = torch.load(f'/content/drive/MyDrive/XMC/LightXML/models/checkpoint-{get_exp_name()}.pth', map_location = torch.device('cuda'))
+        model.load_state_dict(checkpoint['model_state_dict'])
+        optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        epoch = checkpoint['epoch']
+        max_only_p5 = checkpoint['max_only_p5']
         model = model.cuda()
 
     if args.eval_model and args.dataset in ['wiki500k', 'amazon670k']:
-        print(f'load /content/drive/MyDrive/XMC/LightXML/models/model-{get_exp_name()}.bin')
+        print(f'load /content/drive/MyDrive/XMC/LightXML/models/model-{get_exp_name()}.pt')
         testloader = DataLoader(MDataset(df, 'test', model.get_fast_tokenizer(), label_map, args.max_len, 
                                          candidates_num=args.group_y_candidate_num),
                                 batch_size=256, num_workers=0, 
@@ -191,7 +208,8 @@ if __name__ == '__main__':
                                           candidates_num=args.group_y_candidate_num),
                                  batch_size=256, num_workers=0, 
                             shuffle=False)
-        model.load_state_dict(torch.load(f'/content/drive/MyDrive/XMC/LightXML/models/model-{get_exp_name()}.bin'))
+        final_model = torch.load(f'/content/drive/MyDrive/XMC/LightXML/models/model-{get_exp_name()}.pt', map_location = torch.device('cuda'))
+        model.load_state_dict(final_model['model_state_dict'])
         model = model.cuda()
 
         print(len(df[df.dataType == 'test']))
@@ -202,4 +220,4 @@ if __name__ == '__main__':
         np.save(f'/content/drive/MyDrive/XMC/LightXML/results/{get_exp_name()}-scores.npy', np.array(pred_scores))
         sys.exit(0)
 
-    train(model, df, label_map)
+    train(model, optimizer, df, label_map, max_only_p5, epoch)
