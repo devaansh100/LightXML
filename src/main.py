@@ -163,10 +163,6 @@ if __name__ == '__main__':
     print(f'load {args.dataset} dataset with '
           f'{len(df[df.dataType =="train"])} train {len(df[df.dataType =="test"])} test with {len(label_map)} labels done')
 
-    optimizer_grouped_parameters = [
-        {'params': [p for n, p in model.named_parameters() if not any(nd in n for nd in no_decay)], 'weight_decay': 0.01},
-        {'params': [p for n, p in model.named_parameters() if any(nd in n for nd in no_decay)], 'weight_decay': 0.0}
-        ]
     if args.dataset in ['wiki500k', 'amazon670k']:
         group_y = load_group(args.dataset, args.group_y_group)
         _group_y = []
@@ -182,11 +178,19 @@ if __name__ == '__main__':
                           use_swa=args.swa, swa_warmup_epoch=args.swa_warmup, swa_update_step=args.swa_step,
                           candidates_topk=args.group_y_candidate_topk,
                           hidden_dim=args.hidden_dim)
+        optimizer_grouped_parameters = [
+        {'params': [p for n, p in model.named_parameters() if not any(nd in n for nd in no_decay)], 'weight_decay': 0.01},
+        {'params': [p for n, p in model.named_parameters() if any(nd in n for nd in no_decay)], 'weight_decay': 0.0}
+        ]
         optimizer = AdamW(optimizer_grouped_parameters, lr=args.lr)#, eps=1e-8)
     else:
         model = LightXML(n_labels=len(label_map), bert=args.bert,
                          update_count=args.update_count,
                          use_swa=args.swa, swa_warmup_epoch=args.swa_warmup, swa_update_step=args.swa_step)
+        optimizer_grouped_parameters = [
+        {'params': [p for n, p in model.named_parameters() if not any(nd in n for nd in no_decay)], 'weight_decay': 0.01},
+        {'params': [p for n, p in model.named_parameters() if any(nd in n for nd in no_decay)], 'weight_decay': 0.0}
+        ]
         optimizer = AdamW(optimizer_grouped_parameters, lr=args.lr)#, eps=1e-8)
     if args.load_chk:
         checkpoint = torch.load(f'/content/drive/MyDrive/XMC/LightXML/models/checkpoint-{get_exp_name()}.pth', map_location = torch.device('cuda'))
