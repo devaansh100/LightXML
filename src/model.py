@@ -56,6 +56,12 @@ class LightXML(nn.Module):
         self.feature_layers, self.drop_out = feature_layers, nn.Dropout(dropout)
 
         self.group_y = group_y
+        in_dim, in_channels, reduced_dim
+        self.se = SqueezeExcitation(
+                    in_dim = 768,
+                    in_channels = 5,
+                    reduced_dim = 2
+                )
         if self.group_y is not None:
             self.group_y_labels = group_y.shape[0]
             print('hidden dim:',  hidden_dim)
@@ -95,7 +101,12 @@ class LightXML(nn.Module):
             attention_mask=attention_mask,
             token_type_ids=token_type_ids
         )[-1]
-        out = torch.cat([outs[-i][:, 0] for i in range(1, self.feature_layers+1)], dim=-1)
+        out = torch.stack([outs[-i][:, 0] for i in range(1, self.feature_layers+1)], dim=1)
+        n, c, h, w = out.shape
+        out = out.reshape(n, c, 768, 1)
+        out = self.se(out)
+        out = out.reshape(n, c, h, w)
+        out = out.reshape(n, 1, c*h, w)
         out = self.drop_out(out)
         group_logits = self.l0(out)
         if self.group_y is None:
