@@ -81,15 +81,17 @@ def train(model, optimizer, df, label_map, max_only_p5 = 0, epoch = 0):
                 'optimizer_state_dict': optimizer.state_dict(),
                 'max_only_p5': max_only_p5
                 }, f'/content/drive/MyDrive/XMC/LightXML/models/checkpoint-{get_exp_name()}.pth')
+        print(f'Saving checkpoint at {epoch_c} epochs')
 
         if max_only_p5 < p5:
-            max_only_p5 = p5
             torch.save({
                 'epoch': epoch_c,
                 'model_state_dict': model.state_dict(),
                 'optimizer_state_dict': optimizer.state_dict(),
                 'max_only_p5': max_only_p5
                 }, f'/content/drive/MyDrive/XMC/LightXML/models/model-{get_exp_name()}.pt')
+            print(f'max_only_p5 reduced from {p5} to {max_only_p5}. Saving model at {epoch_c} epochs')
+            max_only_p5 = p5
 
         if epoch_c >= args.epoch + 5 and max_only_p5 != p5:
             break
