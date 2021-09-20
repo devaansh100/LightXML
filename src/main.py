@@ -186,8 +186,8 @@ if __name__ == '__main__':
                          use_swa=args.swa, swa_warmup_epoch=args.swa_warmup, swa_update_step=args.swa_step)
     model.cuda()
     optimizer_g_grouped_parameters = [
-    {'params': [p for n, p in model.l0.named_parameters() if not any(nd in n for nd in no_decay)], 'weight_decay': 0.01},
-    {'params': [p for n, p in model.l0.named_parameters() if any(nd in n for nd in no_decay)], 'weight_decay': 0.0}
+    {'params': [p for n, p in model.generator.named_parameters() if not any(nd in n for nd in no_decay)], 'weight_decay': 0.01},
+    {'params': [p for n, p in model.generator.named_parameters() if any(nd in n for nd in no_decay)], 'weight_decay': 0.0}
     ]
     optimizer_m_grouped_parameters = [
     {'params': [p for n, p in model.named_parameters() if not any(nd in n for nd in no_decay)], 'weight_decay': 0.01},

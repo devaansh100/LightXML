@@ -67,6 +67,12 @@ class LightXML(nn.Module):
         else:
             self.l0 = nn.Linear(self.feature_layers*self.bert.config.hidden_size, n_labels)
 
+        self.generator = nn.Sequential(
+                        self.bert,
+                        self.dropout,
+                        self.l0
+                    )
+
     def get_candidates(self, group_logits, group_gd=None):
         logits = torch.sigmoid(group_logits.detach())
         if group_gd is not None:
@@ -261,22 +267,36 @@ class LightXML(nn.Module):
                 bar.update(1)
 
                 if mode == 'train':
-                    loss_m = outputs[1]
-                    loss_g = outputs[2]
-                    loss = loss_m + moss_g
-                    loss /= self.update_count
-                    train_loss += loss.item()
+                    if self.group_y is not None:
+                        loss_m = outputs[1]
+                        loss_g = outputs[2]
+                        loss = loss_m + loss_g
+                        loss /= self.update_count
+                        train_loss += loss.item()
 
-                    with amp.scale_loss(loss_m, optimizer_m) as scaled_loss:
-                        scaled_loss.backward()
+                        with amp.scale_loss(loss_m, optimizer_m) as scaled_loss:
+                            scaled_loss.backward()
 
-                    with amp.scale_loss(loss_g, optimizer_g) as scaled_loss:
-                        scaled_loss.backward()
-    
-                    if step % self.update_count == 0:
-                        optimizer_g.step()
-                        optimizer_m.step()
-                        self.zero_grad()
+                        with amp.scale_loss(loss_g, optimizer_g) as scaled_loss:
+                            scaled_loss.backward()
+        
+                        if step % self.update_count == 0:
+                            optimizer_g.step()
+                            optimizer_m.step()
+                            self.zero_grad()
+                    else:
+                        loss_m = outputs[1]
+                        loss = loss_m
+                        loss /= self.update_count
+                        train_loss += loss.item()
+
+                        with amp.scale_loss(loss_m, optimizer_m) as scaled_loss:
+                            scaled_loss.backward()
+        
+                        if step % self.update_count == 0:
+                            optimizer_g.step()
+                            optimizer_m.step()
+                            self.zero_grad()
 
                     if step % eval_step == 0 and eval_loader is not None and step != 0:
                         results = self.one_epoch(epoch, eval_loader, optimizer_m, optimizer_g, mode='eval')
