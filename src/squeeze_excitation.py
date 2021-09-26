@@ -20,7 +20,7 @@ class SqueezeExcitation(nn.Module):
 
 	def forward(self, x):
 		out = self.reduce(x)
-		out = self.squeeze(x)
-		out = self.excite(x)
+		out = self.squeeze(out)
+		out = self.excite(out)
 
 		return x * out

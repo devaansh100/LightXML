@@ -56,7 +56,6 @@ class LightXML(nn.Module):
         self.feature_layers, self.drop_out = feature_layers, nn.Dropout(dropout)
 
         self.group_y = group_y
-        in_dim, in_channels, reduced_dim
         self.se = SqueezeExcitation(
                     in_dim = 768,
                     in_channels = 5,
@@ -102,18 +101,20 @@ class LightXML(nn.Module):
             token_type_ids=token_type_ids
         )[-1]
         out = torch.stack([outs[-i][:, 0] for i in range(1, self.feature_layers+1)], dim=1)
-        n, c, h, w = out.shape
+        n, c, h = out.shape
         out = out.reshape(n, c, 768, 1)
         out = self.se(out)
-        out = out.reshape(n, c, h, w)
-        out = out.reshape(n, 1, c*h, w)
+        out = out.reshape(n, c, h)
+        out = out.reshape(n, 1, c*h)
         out = self.drop_out(out)
         group_logits = self.l0(out)
+        group_logits = torch.squeeze(group_logits)
         if self.group_y is None:
             logits = group_logits
             if is_training:
                 loss_fn = torch.nn.BCEWithLogitsLoss()
                 loss = loss_fn(logits, labels)
+                loss = torch.squeeze(loss)
                 return logits, loss
             else:
                 return logits
