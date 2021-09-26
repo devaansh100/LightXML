@@ -24,9 +24,10 @@ if __name__ == '__main__':
         model_name = '_'.join([i for i in model_name if i != ''])
 
         model = LightXML(n_labels=len(label_map), bert=berts[index])
+        model_dict = torch.load(f'/content/drive/MyDrive/XMC/LightXML/models/model-{model_name}.pt', map_location = torch.device('cuda'))
 
-        print(f'models/model-model_name.bin')
-        model.load_state_dict(torch.load(f'models/model-{model_name}.bin'))
+        print(f'/content/drive/MyDrive/XMC/LightXML/models/model-{model_name}.pt')
+        model.load_state_dict(model_dict['model_state_dict'])
 
         tokenizer = model.get_tokenizer()
         test_d = MDataset(df, 'test', tokenizer, label_map, 128 if args.dataset == 'amazoncat13k' and berts[index] == 'xlnent' else 512)
