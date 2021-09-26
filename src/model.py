@@ -105,16 +105,14 @@ class LightXML(nn.Module):
         out = out.reshape(n, c, 768, 1)
         out = self.se(out)
         out = out.reshape(n, c, h)
-        out = out.reshape(n, 1, c*h)
+        out = out.reshape(n, c*h)
         out = self.drop_out(out)
         group_logits = self.l0(out)
-        group_logits = torch.squeeze(group_logits)
         if self.group_y is None:
             logits = group_logits
             if is_training:
                 loss_fn = torch.nn.BCEWithLogitsLoss()
                 loss = loss_fn(logits, labels)
-                loss = torch.squeeze(loss)
                 return logits, loss
             else:
                 return logits
