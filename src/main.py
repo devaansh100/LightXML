@@ -54,7 +54,8 @@ def train(model, optimizer_g, optimizer_m, df, label_map, max_only_p5 = 0, epoch
 
     model.cuda()
         
-    model, optimizer_m, optimizer_g = amp.initialize(model, optimizer_m, optimizer_g, opt_level="O1")
+    model, optimizer_m = amp.initialize(model, optimizer_m, opt_level="O1")
+    model.generator, optimizer_g = amp.initialize(model.generator, optimizer_g, opt_level="O1")
 
     for epoch_c in range(epoch+1, args.epoch+5):
         train_loss = model.one_epoch(epoch_c, trainloader, optimizer_m, optimizer_g, mode='train',
@@ -81,7 +82,7 @@ def train(model, optimizer_g, optimizer_m, df, label_map, max_only_p5 = 0, epoch
                 'optimizer_g_state_dict': optimizer_g.state_dict(),
                 'optimizer_m_state_dict_m': optimizer_m.state_dict(),
                 'max_only_p5': max_only_p5
-                }, f'/content/drive/MyDrive/XMC/LightXML/models/checkpoint-{get_exp_name()}.pth')
+                }, f'/content/drive/MyDrive/XMC/LightXML/models/checkpoint-{get_exp_name()}-lc.pth')
         print(f'Saving checkpoint at {epoch_c} epochs')
 
         if max_only_p5 < p5:
@@ -91,7 +92,7 @@ def train(model, optimizer_g, optimizer_m, df, label_map, max_only_p5 = 0, epoch
                 'optimizer_g_state_dict_g': optimizer_g.state_dict(),
                 'optimizer_m_state_dict_m': optimizer_m.state_dict(),
                 'max_only_p5': max_only_p5
-                }, f'/content/drive/MyDrive/XMC/LightXML/models/model-{get_exp_name()}.pt')
+                }, f'/content/drive/MyDrive/XMC/LightXML/models/model-{get_exp_name()}-lc.pt')
             print(f'max_only_p5 reduced from {p5} to {max_only_p5}. Saving model at {epoch_c} epochs')
             max_only_p5 = p5
 
@@ -196,7 +197,7 @@ if __name__ == '__main__':
     optimizer_g = AdamW(optimizer_g_grouped_parameters, lr=args.lr)#, eps=1e-8)
     optimizer_m = AdamW(optimizer_m_grouped_parameters, lr=args.lr)#, eps=1e-8)
     if args.load_chk:
-        checkpoint = torch.load(f'/content/drive/MyDrive/XMC/LightXML/models/checkpoint-{get_exp_name()}.pth', map_location = torch.device('cuda'))
+        checkpoint = torch.load(f'/content/drive/MyDrive/XMC/LightXML/models/checkpoint-{get_exp_name()}-lc.pth', map_location = torch.device('cuda'))
         model.load_state_dict(checkpoint['model_state_dict'])
         optimizer_g.load_state_dict(checkpoint['optimizer_g_state_dict'])
         optimizer_m.load_state_dict(checkpoint['optimizer_m_state_dict'])
@@ -206,7 +207,7 @@ if __name__ == '__main__':
         sys.exit(0)
 
     if args.eval_model and args.dataset in ['wiki500k', 'amazon670k']:
-        print(f'load /content/drive/MyDrive/XMC/LightXML/models/model-{get_exp_name()}.pt')
+        print(f'load /content/drive/MyDrive/XMC/LightXML/models/model-{get_exp_name()}-lc.pt')
         testloader = DataLoader(MDataset(df, 'test', model.get_fast_tokenizer(), label_map, args.max_len, 
                                          candidates_num=args.group_y_candidate_num),
                                 batch_size=256, num_workers=0, 
@@ -217,7 +218,7 @@ if __name__ == '__main__':
                                           candidates_num=args.group_y_candidate_num),
                                  batch_size=256, num_workers=0, 
                             shuffle=False)
-        final_model = torch.load(f'/content/drive/MyDrive/XMC/LightXML/models/model-{get_exp_name()}.pt', map_location = torch.device('cuda'))
+        final_model = torch.load(f'/content/drive/MyDrive/XMC/LightXML/models/model-{get_exp_name()}-lc.pt', map_location = torch.device('cuda'))
         model.load_state_dict(final_model['model_state_dict'])
         model = model.cuda()
 
