@@ -69,7 +69,7 @@ class LightXML(nn.Module):
 
         self.generator = nn.Sequential(
                         self.bert,
-                        self.dropout,
+                        self.drop_out,
                         self.l0
                     )
 
