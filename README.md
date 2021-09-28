@@ -26,6 +26,8 @@ LightXML concats the last 5 hidden layers of the transformer output to create te
 
 Implementation of the same can be viewed in the ```squeeze_and_excitation``` branch.
 
+Since the number of channels is less, reducing the dimesnions to 2 will not be very expressive. For that, we can perform some convolutions to increase the number of channels to accentuate the channel attention.
+
 ### Loss Correction
 
 There seems to be an oversight in the original LightXML paper. It mentions that the loss function would be ```Lg + Ld``` and would be backpropagated from the discriminator. However, since ```Lg``` does not contain any information of the discriminator, it instantly goes to 0 in the first partial derivative. Therefore, all the gradient updates that occur in the generator happen due to the information in ```Ld```. While this is giving good results, it has not reached its full potential, since the generator loss function information is not being used. To fix this, add the generator loss to upstream loss and continue the backpropagation process.
