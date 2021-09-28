@@ -1,7 +1,6 @@
 # LightXML
 
-LightXML: Transformer with dynamic negative sampling for High-Performance Extreme Multi-label Text Classiﬁcation
-This repository was forked from https://github.com/kongds/LightXML. The main branch has the added functionality of loading a model from checkpoint. The aim of this repository is to implement suggested improvements in the original LightXML model.
+LightXML: Transformer with dynamic negative sampling for High-Performance Extreme Multi-label Text Classiﬁcation. This repository was forked from https://github.com/kongds/LightXML. The main branch has the added functionality of loading a model from checkpoint. The aim of this repository is to implement suggested improvements in the original LightXML model.
 
 ## Datasets
 LightXML uses the same dataset with AttentionXML and X-Transform.
@@ -26,7 +25,7 @@ LightXML concats the last 5 hidden layers of the transformer output to create te
 
 Implementation of the same can be viewed in the ```squeeze_and_excitation``` branch.
 
-Since the number of channels is less, reducing the dimesnions to 2 will not be very expressive. For that, we can perform some convolutions to increase the number of channels to accentuate the channel attention.
+Since the number of channels is less, reducing the dimenions to 2 will not be very expressive. For that, we can perform some convolutions to increase the number of channels to accentuate the channel attention.
 
 ### Loss Correction
 
@@ -39,3 +38,9 @@ Implementation of the same can be viewed in the ```loss_correction``` branch.
 Eventually, the top b clusters for any instance would not change very much due to the stochastic weight averaging reducing the gradient magnitudes and stabilisation of the model. To keep the proces of dynamic negative sampling vcontinuing, we can randomly choose and add a fixed number of negative labels to each instance. The same was implemented in the Astec algorithm.
 
 <!-- Implementation of the same can be viewed in the ```negative_sampling``` branch. -->
+
+### Text Representation
+
+Currently, the text representation is done solely through the  BERT [CLS] token. This does not utilise the full capacity of BERT. We can use the combination block as suggested in DECAF for the discriminator. The token representations can be added and finally combined with the sentence embedding. If the tokens increase the loss of the model, then during training, their weight vector will naturally be pushed to towards zero.
+
+Taking inspiration from Bonsai, the combination block can be extended to also include representation of co-occuring labels. As before, if this increases the loss, it's weight vector will be pushed towards zero.
