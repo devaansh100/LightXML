@@ -39,8 +39,8 @@ Eventually, the top b clusters for any instance would not change very much due t
 
 ### Document Representation
 
-Currently, the document representation is done solely through the [CLS] token. This does not utilise the full capacity of BERT, ie, the token representations are being wasted.. We can use the combination block as suggested in DECAF for the discriminator. The token representations can be added and finally combined with the sentence embedding. If the tokens increase the loss of the model, then during training, their weight vector will naturally be pushed to towards zero.
+Currently, the document representation is done solely through the [CLS] token. This does not utilise the full capacity of BERT, ie, the token representations are being wasted. We can use the combination block as suggested in DECAF for the discriminator. The token representations can be added and finally combined with the sentence embedding. If the tokens increase the loss of the model, then during training, their weight vector will naturally be pushed to towards zero.
 
 Taking inspiration from Bonsai, the combination block can be extended to also include representation of co-occuring labels. As before, if this increases the loss, it's weight vector will be pushed towards zero.
 
-This block can either be added only in the classifier, or it can be used to create the Document representation itself.
+This block can either be added only in the classifier, or it can be used to create the document representation itself.
