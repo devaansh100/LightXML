@@ -43,4 +43,4 @@ Currently, the document representation is done solely through the [CLS] token. T
 
 Taking inspiration from Bonsai, the combination block can be extended to also include representation of co-occuring labels. As before, if this increases the loss, it's weight vector will be pushed towards zero.
 
-This block can either be added only in the classifier, or it can be used to create the document representation itself. 
+This block can either be added only in the classifier, or it can be used to create the document representation itself.
