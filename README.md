@@ -23,9 +23,9 @@ train and eval
 
 LightXML concats the last 5 hidden layers of the transformer output to create text embeddings. While the transformer model does have self-attention built in, the squeeze and excitation block adds a second layer of attention between these 5 hidden layers. It allows the text representations to be more expressive since the more relevant layers will be scaled up. Another self-attention layer can be added for each element of the embedding, however, that will increase the model size much more than this block.
 
-Implementation of the same can be viewed in the ```squeeze_and_excitation``` branch.
-
 Since the number of channels is less, reducing the dimenions to 2 will not be very expressive. For that, we can perform some convolutions to increase the number of channels to accentuate the channel attention.
+
+Implementation of the same can be viewed in the ```squeeze_and_excitation``` branch.
 
 ### Loss Correction
 
@@ -44,3 +44,5 @@ Currently, the document representation is done solely through the [CLS] token. T
 Taking inspiration from Bonsai, the combination block can be extended to also include representation of co-occuring labels. As before, if this increases the loss, it's weight vector will be pushed towards zero.
 
 This block can either be added only in the classifier, or it can be used to create the document representation itself.
+
+Implementation of the same can be viewed in the ```doc_rep``` branch.
