@@ -14,6 +14,8 @@ from transformers import XLNetTokenizer, XLNetModel, XLNetConfig
 from tokenizers import BertWordPieceTokenizer
 from transformers import RobertaTokenizerFast
 
+from combination import CombinationBlock
+
 def get_bert(bert_name):
     if 'roberta' in bert_name:
         print('load roberta-base')
@@ -67,6 +69,8 @@ class LightXML(nn.Module):
         else:
             self.l0 = nn.Linear(self.feature_layers*self.bert.config.hidden_size, n_labels)
 
+        self.combination = CombinationBlock(self.feature_layers*self.bert.config.hidden_size)
+
     def get_candidates(self, group_logits, group_gd=None):
         logits = torch.sigmoid(group_logits.detach())
         if group_gd is not None:
@@ -88,13 +92,24 @@ class LightXML(nn.Module):
                 labels=None, group_labels=None, candidates=None):
         is_training = labels is not None
 
-        outs = self.bert(
+        token_emb, outs = self.bert(
             input_ids,
             attention_mask=attention_mask,
             token_type_ids=token_type_ids
-        )[-1]
+        ) # check size here for any other possible output values
+
+        # Each token embedding is of size 768. token_emb will be of shape (N, n_tokens, 768). outs is of size 768*5. Divide n_tokens by 5, add 
+        # the token embeddings in each group and concatenate the outputs.
+        n_batches, n_tokens, dim = token_emb.shape
+        token_reps = torch.zeros(token_emb.shape[0], dim*self.feature_layers) # Check shape. It should be equal to outs
+        for batch in token_emb.shape[0]:
+            group_tokens = int(n_tokens/self.feature_layers)
+            for i in range(self.feature_layers-1):
+                token_reps[batch, i*dim:(i+1)*dim] = torch.sum(token_emb(batch, i*group_tokens:(i+1)*group_tokens,:))
+            token_reps[batch, i*dim:(i+1)*dim] = torch.sum(token_emb(batch, i*group_tokens:))
 
         out = torch.cat([outs[-i][:, 0] for i in range(1, self.feature_layers+1)], dim=-1)
+        out = combination(out, token_reps)
         out = self.drop_out(out)
         group_logits = self.l0(out)
         if self.group_y is None:
