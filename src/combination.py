@@ -10,9 +10,9 @@ class CombinationBlock(nn.Module):
 		self.gamma = Vector(n_features)
 
 	def forward(self, x, bert_tokens, labels_cooccur):
-		out = np.multiply(self.alpha, x) + np.multiply(self.beta, bert_tokens)
+		out = np.multiply(F.relu(self.alpha), x) + np.multiply(F.relu(self.beta), bert_tokens)
 		if self.train():
-			out += np.multiply(self.gamma, labels_cooccur)
+			out += np.multiply(F.relu(self.gamma), labels_cooccur)
 
 		return out
 
