@@ -109,7 +109,7 @@ class LightXML(nn.Module):
             token_reps[batch, i*dim:(i+1)*dim] = torch.sum(token_emb(batch, i*group_tokens:))
 
         out = torch.cat([outs[-i][:, 0] for i in range(1, self.feature_layers+1)], dim=-1)
-        out = combination(out, token_reps)
+        out = self.combination(out, token_reps)
         out = self.drop_out(out)
         group_logits = self.l0(out)
         if self.group_y is None:
