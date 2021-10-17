@@ -35,7 +35,9 @@ Implementation of the same can be viewed in the ```loss_correction``` branch.
 
 ### Negative Sampling
 
-Eventually, the top b clusters for any instance would not change very much due to the stochastic weight averaging reducing the gradient magnitudes and stabilisation of the model. To keep the proces of dynamic negative sampling vcontinuing, we can randomly choose and add a fixed number of negative labels to each instance. The same was implemented in the Astec algorithm.
+Eventually, the top b clusters for any instance would not change very much due to the stochastic weight averaging reducing the gradient magnitudes and stabilisation of the model. To keep the proces of dynamic negative sampling continuing, we can randomly choose and add a fixed number of negative labels to each instance. The same was implemented in the Astec algorithm.
+
+Implementation of the same can be viewed in the ```negative_samplingg``` branch.
 
 ### Document Representation
 
