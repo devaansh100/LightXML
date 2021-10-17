@@ -6,6 +6,7 @@ from apex import amp
 
 import torch
 from torch import nn
+import math
 
 from transformers import BertTokenizer, BertConfig, BertModel
 from transformers import RobertaModel, RobertaConfig, RobertaTokenizer
@@ -69,9 +70,18 @@ class LightXML(nn.Module):
 
     def get_candidates(self, group_logits, group_gd=None):
         logits = torch.sigmoid(group_logits.detach())
+        n_clusters = len(logits)
         if group_gd is not None:
             logits += group_gd
-        scores, indices = torch.topk(logits, k=self.candidates_topk)
+        k = self.candidates_topk
+        scores, indices = torch.topk(logits, k=k)
+
+        # Randomly adding clusters to shortlist
+        random_indices = np.random.choice(arange(k+1, n_clusters),math.ceil(n_clusters/100), replace = False)
+        random_scores = logits[random_indices]
+        scores = torch.tensor([*scores, *random_scores])
+        indices = torch.tensor([*indices, *random_indices])
+
         scores, indices = scores.cpu().detach().numpy(), indices.cpu().detach().numpy()
         candidates, candidates_scores = [], []
         for index, score in zip(indices, scores):
