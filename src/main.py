@@ -142,6 +142,7 @@ parser.add_argument('--eval_model', action='store_true')
 parser.add_argument('--load_chk', action='store_true', required = False)
 parser.add_argument('--load_chk_name', type=str, required = False, default = 'model-eurlex4k')
 parser.add_argument('--init_model', action='store_true')
+parser.add_argument('--store_init_model', action='store_true')
 
 args = parser.parse_args()
 
@@ -189,15 +190,16 @@ if __name__ == '__main__':
     {'params': [p for n, p in model.named_parameters() if any(nd in n for nd in no_decay)], 'weight_decay': 0.0}
     ]
     optimizer = AdamW(optimizer_grouped_parameters, lr=args.lr)#, eps=1e-8)
-    torch.save({
-                'model_state_dict': model.state_dict(),
-                'optimizer_state_dict': optimizer.state_dict()
-                }, f'/scratch/work/guptad2/XMC/LightXML/models/model-{get_exp_name()}-init.pth'
-                )
+    if args.store_init_model:
+        torch.save({
+                    'model_state_dict': model.state_dict(),
+                    'optimizer_state_dict': optimizer.state_dict()
+                    }, f'/scratch/work/guptad2/XMC/LightXML/models/model-{get_exp_name()}-init.pth'
+                    )
     if args.init_model:
         init = torch.load(f'/scratch/work/guptad2/XMC/LightXML/models/model-{get_exp_name()}-init.pth', map_location = torch.device('cuda'))
-        model.load_state_dict(checkpoint['model_state_dict'])
-        optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        model.load_state_dict(init['model_state_dict'])
+        optimizer.load_state_dict(init['optimizer_state_dict'])
         train(model, optimizer, df, label_map)
         sys.exit(0)
     if args.load_chk:
