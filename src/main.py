@@ -80,7 +80,7 @@ def train(model, optimizer, df, label_map, max_only_p5 = 0, epoch = 0):
                 'model_state_dict': model.state_dict(),
                 'optimizer_state_dict': optimizer.state_dict(),
                 'max_only_p5': max_only_p5
-                }, f'/content/drive/MyDrive/XMC/LightXML/models/checkpoint-{get_exp_name()}.pth')
+                }, f'/scratch/work/guptad2/XMC/LightXML/models/checkpoint-{get_exp_name()}.pth')
         print(f'Saving checkpoint at {epoch_c} epochs')
 
         if max_only_p5 < p5:
@@ -89,7 +89,7 @@ def train(model, optimizer, df, label_map, max_only_p5 = 0, epoch = 0):
                 'model_state_dict': model.state_dict(),
                 'optimizer_state_dict': optimizer.state_dict(),
                 'max_only_p5': max_only_p5
-                }, f'/content/drive/MyDrive/XMC/LightXML/models/model-{get_exp_name()}.pt')
+                }, f'/scratch/work/guptad2/XMC/LightXML/models/model-{get_exp_name()}.pt')
             print(f'max_only_p5 reduced from {p5} to {max_only_p5}. Saving model at {epoch_c} epochs')
             max_only_p5 = p5
 
@@ -141,6 +141,7 @@ parser.add_argument('--eval_model', action='store_true')
 
 parser.add_argument('--load_chk', action='store_true', required = False)
 parser.add_argument('--load_chk_name', type=str, required = False, default = 'model-eurlex4k')
+parser.add_argument('--init_model', action='store_true')
 
 args = parser.parse_args()
 
@@ -188,8 +189,19 @@ if __name__ == '__main__':
     {'params': [p for n, p in model.named_parameters() if any(nd in n for nd in no_decay)], 'weight_decay': 0.0}
     ]
     optimizer = AdamW(optimizer_grouped_parameters, lr=args.lr)#, eps=1e-8)
+    torch.save({
+                'model_state_dict': model.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict()
+                }, f'/scratch/work/guptad2/XMC/LightXML/models/model-{get_exp_name()}-init.pth'
+                )
+    if args.init_model:
+        init = torch.load(f'/scratch/work/guptad2/XMC/LightXML/models/model-{get_exp_name()}-init.pth', map_location = torch.device('cuda'))
+        model.load_state_dict(checkpoint['model_state_dict'])
+        optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        train(model, optimizer, df, label_map)
+        sys.exit(0)
     if args.load_chk:
-        checkpoint = torch.load(f'/content/drive/MyDrive/XMC/LightXML/models/checkpoint-{get_exp_name()}.pth', map_location = torch.device('cuda'))
+        checkpoint = torch.load(f'/scratch/work/guptad2/XMC/LightXML/models/checkpoint-{get_exp_name()}.pth', map_location = torch.device('cuda'))
         model.load_state_dict(checkpoint['model_state_dict'])
         optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
         epoch = checkpoint['epoch']
@@ -198,7 +210,7 @@ if __name__ == '__main__':
         sys.exit(0)
 
     if args.eval_model and args.dataset in ['wiki500k', 'amazon670k']:
-        print(f'load /content/drive/MyDrive/XMC/LightXML/models/model-{get_exp_name()}.pt')
+        print(f'load /scratch/work/guptad2/XMC/LightXML/models/model-{get_exp_name()}.pt')
         testloader = DataLoader(MDataset(df, 'test', model.get_fast_tokenizer(), label_map, args.max_len, 
                                          candidates_num=args.group_y_candidate_num),
                                 batch_size=256, num_workers=0, 
@@ -209,7 +221,7 @@ if __name__ == '__main__':
                                           candidates_num=args.group_y_candidate_num),
                                  batch_size=256, num_workers=0, 
                             shuffle=False)
-        final_model = torch.load(f'/content/drive/MyDrive/XMC/LightXML/models/model-{get_exp_name()}.pt', map_location = torch.device('cuda'))
+        final_model = torch.load(f'/scratch/work/guptad2/XMC/LightXML/models/model-{get_exp_name()}.pt', map_location = torch.device('cuda'))
         model.load_state_dict(final_model['model_state_dict'])
         model = model.cuda()
 
@@ -217,8 +229,8 @@ if __name__ == '__main__':
         model.one_epoch(0, validloader, None, mode='eval')
 
         pred_scores, pred_labels = model.one_epoch(0, testloader, None, mode='test')
-        np.save(f'/content/drive/MyDrive/XMC/LightXML/results/{get_exp_name()}-labels.npy', np.array(pred_labels))
-        np.save(f'/content/drive/MyDrive/XMC/LightXML/results/{get_exp_name()}-scores.npy', np.array(pred_scores))
+        np.save(f'/scratch/work/guptad2/XMC/LightXML/results/{get_exp_name()}-labels.npy', np.array(pred_labels))
+        np.save(f'/scratch/work/guptad2/XMC/LightXML/results/{get_exp_name()}-scores.npy', np.array(pred_scores))
         sys.exit(0)
 
     train(model, optimizer, df, label_map)
