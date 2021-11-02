@@ -82,7 +82,7 @@ def train(model, optimizer_g, optimizer_m, df, label_map, max_only_p5 = 0, epoch
                 'optimizer_g_state_dict': optimizer_g.state_dict(),
                 'optimizer_m_state_dict_m': optimizer_m.state_dict(),
                 'max_only_p5': max_only_p5
-                }, f'/content/drive/MyDrive/XMC/LightXML/models/checkpoint-{get_exp_name()}-lc.pth')
+                }, f'/scratch/work/guptad2/XMC/LightXML/models/loss_correction/checkpoint-{get_exp_name()}-lc.pth')
         print(f'Saving checkpoint at {epoch_c} epochs')
 
         if max_only_p5 < p5:
@@ -92,7 +92,7 @@ def train(model, optimizer_g, optimizer_m, df, label_map, max_only_p5 = 0, epoch
                 'optimizer_g_state_dict_g': optimizer_g.state_dict(),
                 'optimizer_m_state_dict_m': optimizer_m.state_dict(),
                 'max_only_p5': max_only_p5
-                }, f'/content/drive/MyDrive/XMC/LightXML/models/model-{get_exp_name()}-lc.pt')
+                }, f'/scratch/work/guptad2/XMC/LightXML/models/loss_correction/model-{get_exp_name()}-lc.pt')
             print(f'max_only_p5 reduced from {p5} to {max_only_p5}. Saving model at {epoch_c} epochs')
             max_only_p5 = p5
 
@@ -144,6 +144,8 @@ parser.add_argument('--eval_model', action='store_true')
 
 parser.add_argument('--load_chk', action='store_true', required = False)
 parser.add_argument('--load_chk_name', type=str, required = False, default = 'model-eurlex4k')
+parser.add_argument('--init_model', action='store_true')
+parser.add_argument('--store_init_model', action='store_true')
 
 args = parser.parse_args()
 
@@ -186,28 +188,34 @@ if __name__ == '__main__':
                          update_count=args.update_count,
                          use_swa=args.swa, swa_warmup_epoch=args.swa_warmup, swa_update_step=args.swa_step)
     model.cuda()
-    optimizer_g_grouped_parameters = [
-    {'params': [p for n, p in model.generator.named_parameters() if not any(nd in n for nd in no_decay)], 'weight_decay': 0.01},
-    {'params': [p for n, p in model.generator.named_parameters() if any(nd in n for nd in no_decay)], 'weight_decay': 0.0}
-    ]
-    optimizer_m_grouped_parameters = [
+    optimizer_grouped_parameters = [
     {'params': [p for n, p in model.named_parameters() if not any(nd in n for nd in no_decay)], 'weight_decay': 0.01},
     {'params': [p for n, p in model.named_parameters() if any(nd in n for nd in no_decay)], 'weight_decay': 0.0}
     ]
-    optimizer_g = AdamW(optimizer_g_grouped_parameters, lr=args.lr)#, eps=1e-8)
-    optimizer_m = AdamW(optimizer_m_grouped_parameters, lr=args.lr)#, eps=1e-8)
+    optimizer = AdamW(optimizer_grouped_parameters, lr=args.lr)#, eps=1e-8)
+    if args.store_init_model:
+        torch.save({
+                    'model_state_dict': model.state_dict(),
+                    'optimizer_state_dict': optimizer.state_dict()
+                    }, f'/scratch/work/guptad2/XMC/LightXML/models/loss_correction/model-{get_exp_name()}-init.pth'
+                    )
+    if args.init_model:
+        init = torch.load(f'/scratch/work/guptad2/XMC/LightXML/models/loss_correction/model-{get_exp_name()}-init.pth', map_location = torch.device('cuda'))
+        model.load_state_dict(init['model_state_dict'])
+        optimizer.load_state_dict(init['optimizer_state_dict'])
+        train(model, optimizer, df, label_map)
+        sys.exit(0)
     if args.load_chk:
-        checkpoint = torch.load(f'/content/drive/MyDrive/XMC/LightXML/models/checkpoint-{get_exp_name()}-lc.pth', map_location = torch.device('cuda'))
+        checkpoint = torch.load(f'/scratch/work/guptad2/XMC/LightXML/models/loss_correction/checkpoint-{get_exp_name()}.pth', map_location = torch.device('cuda'))
         model.load_state_dict(checkpoint['model_state_dict'])
-        optimizer_g.load_state_dict(checkpoint['optimizer_g_state_dict'])
-        optimizer_m.load_state_dict(checkpoint['optimizer_m_state_dict'])
+        optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
         epoch = checkpoint['epoch']
         max_only_p5 = checkpoint['max_only_p5']
-        train(model, optimizer_g, optimizer_m, df, label_map, max_only_p5, epoch)
+        train(model, optimizer, df, label_map, max_only_p5, epoch)
         sys.exit(0)
 
     if args.eval_model and args.dataset in ['wiki500k', 'amazon670k']:
-        print(f'load /content/drive/MyDrive/XMC/LightXML/models/model-{get_exp_name()}-lc.pt')
+        print(f'load /scratch/work/guptad2/XMC/LightXML/models/loss_correction/model-{get_exp_name()}.pt')
         testloader = DataLoader(MDataset(df, 'test', model.get_fast_tokenizer(), label_map, args.max_len, 
                                          candidates_num=args.group_y_candidate_num),
                                 batch_size=256, num_workers=0, 
@@ -218,7 +226,7 @@ if __name__ == '__main__':
                                           candidates_num=args.group_y_candidate_num),
                                  batch_size=256, num_workers=0, 
                             shuffle=False)
-        final_model = torch.load(f'/content/drive/MyDrive/XMC/LightXML/models/model-{get_exp_name()}-lc.pt', map_location = torch.device('cuda'))
+        final_model = torch.load(f'/scratch/work/guptad2/XMC/LightXML/models/loss_correction/model-{get_exp_name()}.pt', map_location = torch.device('cuda'))
         model.load_state_dict(final_model['model_state_dict'])
         model = model.cuda()
 
@@ -226,8 +234,8 @@ if __name__ == '__main__':
         model.one_epoch(0, validloader, None, mode='eval')
 
         pred_scores, pred_labels = model.one_epoch(0, testloader, None, mode='test')
-        np.save(f'/content/drive/MyDrive/XMC/LightXML/results/{get_exp_name()}-labels.npy', np.array(pred_labels))
-        np.save(f'/content/drive/MyDrive/XMC/LightXML/results/{get_exp_name()}-scores.npy', np.array(pred_scores))
+        np.save(f'/scratch/work/guptad2/XMC/LightXML/results/{get_exp_name()}-labels.npy', np.array(pred_labels))
+        np.save(f'/scratch/work/guptad2/XMC/LightXML/results/{get_exp_name()}-scores.npy', np.array(pred_scores))
         sys.exit(0)
 
-    train(model, optimizer_g, optimizer_m, df, label_map)
+    train(model, optimizer, df, label_map)
